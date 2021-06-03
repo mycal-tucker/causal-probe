@@ -17,16 +17,16 @@ dataset:
     dev_path: ptb_dev.conllx
     test_path: ptb_test.conllx
   embeddings:
-    type: token #{token,subword}
+    type: token
     root: data/ptb/
     train_path: ptb_train.hdf5
     dev_path: ptb_dev.hdf5
     test_path: ptb_test.hdf5
-    break_on_qmark: True  # FIXME: is this used?
+    break_on_qmark: False
   batch_size: 40
 model:
   hidden_dim: 1024
-  model_type: DistilQA-disk # BERT-disk, ELMo-disk,
+  model_type: BERT-disk
   use_disk: True
   model_layer: -1  # Doesn't matter, gets overwritten by script that iterates over layers.
 probe:

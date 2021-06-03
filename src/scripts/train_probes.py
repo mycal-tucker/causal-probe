@@ -49,20 +49,18 @@ def choose_task_classes(args):
 
 
 def choose_dataset_class(args):
-    """Chooses which dataset class to use based on config.
+    """
+
+    Legacy layer of abstraction for representing dataset class. We only have one type, so just pipes through right
+    now.
 
   Args:
     args: the global config dictionary built by yaml.
   Returns:
     A class to be instantiated as a dataset.
   """
-    # FIXME: I should only have one type right now because I don't support other models.
-    if args['model']['model_type'] in {'ELMo-disk', 'ELMo-random-projection', 'ELMo-decay'}:
-        dataset_class = dataset.ELMoDataset
-    elif args['model']['model_type'] == 'BERT-disk':
+    if args['model']['model_type'] == 'BERT-disk':
         dataset_class = dataset.BERTDataset
-    elif args['model']['model_type'] == 'DistilQA-disk':
-        dataset_class = dataset.DISTILDataset
     else:
         raise ValueError("Unknown model type for datasets: {}".format(
             args['model']['model_type']))

@@ -146,38 +146,6 @@ class SimpleDataset:
             embedded_observations.append(embedded_observation)
         return embedded_observations
 
-    def generate_token_embeddings_from_hdf5(self, args, observations, filepath, layer_index):
-        '''Reads pre-computed embeddings from ELMo-like hdf5-formatted file.
-
-    Sentences should be given integer keys corresponding to their order
-    in the original file.
-    Embeddings should be of the form (layer_count, sent_length, feature_count)
-
-    Args:
-      args: the global yaml-derived experiment config dictionary.
-      observations: A list of Observations composing a dataset.
-      filepath: The filepath of a hdf5 file containing embeddings.
-      layer_index: The index corresponding to the layer of representation
-          to be used. (e.g., 0, 1, 2 for ELMo0, ELMo1, ELMo2.)
-    
-    Returns:
-      A list of numpy matrices; one for each observation.
-
-    Raises:
-      AssertionError: sent_length of embedding was not the length of the
-        corresponding sentence in the dataset.
-    '''
-        hf = h5py.File(filepath, 'r')
-        indices = filter(lambda x: x != 'sentence_to_index', list(hf.keys()))
-        single_layer_features_list = []
-        for index in sorted([int(x) for x in indices]):
-            observation = observations[index]
-            feature_stack = hf[str(index)]
-            single_layer_features = feature_stack[layer_index]
-            assert single_layer_features.shape[0] == len(observation.sentence)
-            single_layer_features_list.append(single_layer_features)
-        return single_layer_features_list
-
     def integerize_observations(self, observations):
         '''Replaces strings in an Observation with integer Ids.
     
@@ -238,22 +206,22 @@ class SimpleDataset:
         return observations
 
     def custom_pad(self, batch_observations):
-        '''Pads sequences with 0 and labels with -1; used as collate_fn of DataLoader.
-    
+        """Pads sequences with 0 and labels with -1; used as collate_fn of DataLoader.
+
     Loss functions will ignore -1 labels.
     If labels are 1D, pads to the maximum sequence length.
     If labels are 2D, pads all to (maxlen,maxlen).
 
     Args:
       batch_observations: A list of observations composing a batch
-    
+
     Return:
       A tuple of:
           input batch, padded
           label batch, padded
           lengths-of-inputs batch, padded
           Observation batch (not padded)
-    '''
+    """
         if self.use_disk_embeddings:
             seqs = [torch.tensor(x[0].embeddings, device=self.args['device']) for x in batch_observations]
         else:
@@ -276,28 +244,8 @@ class SimpleDataset:
         return seqs, labels, lengths, batch_observations
 
 
-class ELMoDataset(SimpleDataset):
-    """Dataloader for conllx files and pre-computed ELMo embeddings.
-
-  See SimpleDataset.
-  Assumes embeddings are aligned with tokens in conllx file.
-  Attributes:
-    args: the global yaml-derived experiment config dictionary
-  """
-
-    def optionally_add_embeddings(self, observations, pretrained_embeddings_path):
-        """Adds pre-computed ELMo embeddings from disk to Observations."""
-        layer_index = self.args['model']['model_layer']
-        print('Loading ELMo Pretrained Embeddings from {}; using layer {}'.format(pretrained_embeddings_path,
-                                                                                  layer_index))
-        embeddings = self.generate_token_embeddings_from_hdf5(self.args, observations, pretrained_embeddings_path,
-                                                              layer_index)
-        observations = self.add_embeddings_to_observations(observations, embeddings)
-        return observations
-
-
 class SubwordDataset(SimpleDataset):
-    """Dataloader for conllx files and pre-computed ELMo embeddings.
+    """Dataloader for conllx files and pre-computed embeddings.
 
   See SimpleDataset.
   Assumes we have access to the subword tokenizer.
@@ -332,7 +280,7 @@ class SubwordDataset(SimpleDataset):
             tokenized_sent_index += 1
         return mapping
 
-    def generate_subword_embeddings_from_hdf5(self, observations, filepath, elmo_layer, subword_tokenizer=None):
+    def generate_subword_embeddings_from_hdf5(self, observations, filepath, layer, subword_tokenizer=None):
         raise NotImplementedError("Instead of making a SubwordDataset, make one of the implementing classes")
 
 
@@ -344,90 +292,7 @@ class BERTDataset(SubwordDataset):
     args: the global yaml-derived experiment config dictionary
   """
 
-    def generate_subword_embeddings_from_hdf5(self, observations, filepath, elmo_layer, subword_tokenizer=None):
-        '''Reads pre-computed subword embeddings from hdf5-formatted file.
-
-    Sentences should be given integer keys corresponding to their order
-    in the original file.
-    Embeddings should be of the form (layer_count, subword_sent_length, feature_count)
-    subword_sent_length is the length of the sequence of subword tokens
-    when the subword tokenizer was given each canonical token (as given
-    by the conllx file) independently and tokenized each. Thus, there
-    is a single alignment between the subword-tokenized sentence
-    and the conllx tokens.
-
-    Args:
-      args: the global yaml-derived experiment config dictionary.
-      observations: A list of Observations composing a dataset.
-      filepath: The filepath of a hdf5 file containing embeddings.
-      layer_index: The index corresponding to the layer of representation
-          to be used. (e.g., 0, 1, 2 for BERT0, BERT1, BERT2.)
-      subword_tokenizer: (optional) a tokenizer used to map from
-          conllx tokens to subword tokens.
-    
-    Returns:
-      A list of numpy matrices; one for each observation.
-
-    Raises:
-      AssertionError: sent_length of embedding was not the length of the
-        corresponding sentence in the dataset.
-      Exit: importing pytorch_pretrained_bert has failed, possibly due 
-          to downloading of prespecifed tokenizer problem. Not recoverable;
-          exits immediately.
-    '''
-        if subword_tokenizer == None:
-            try:
-                from pytorch_pretrained_bert import BertTokenizer
-                if self.args['model']['hidden_dim'] == 768:
-                    subword_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-                    print('Using BERT-base-cased tokenizer to align embeddings with PTB tokens')
-                elif self.args['model']['hidden_dim'] == 1024:
-                    subword_tokenizer = BertTokenizer.from_pretrained('bert-large-cased')
-                    print('Using BERT-large-cased tokenizer to align embeddings with PTB tokens')
-                else:
-                    print("The heuristic used to choose BERT tokenizers has failed...")
-                    exit()
-            except:
-                print('Couldn\'t import pytorch-pretrained-bert. Exiting...')
-                exit()
-        hf = h5py.File(filepath, 'r')
-        indices = list(hf.keys())
-        single_layer_features_list = []
-        for index in tqdm(sorted([int(x) for x in indices]), desc='[aligning embeddings]'):
-            observation = observations[index]
-            feature_stack = hf[str(index)]
-            single_layer_features = feature_stack[elmo_layer]
-            tokenized_sent = subword_tokenizer.wordpiece_tokenizer.tokenize(
-                '[CLS] ' + ' '.join(observation.sentence) + ' [SEP]')
-            untokenized_sent = observation.sentence
-            untok_tok_mapping = self.match_tokenized_to_untokenized(tokenized_sent, untokenized_sent)
-            assert single_layer_features.shape[0] == len(tokenized_sent)
-            single_layer_features = torch.tensor(
-                [np.mean(single_layer_features[untok_tok_mapping[i][0]:untok_tok_mapping[i][-1] + 1, :], axis=0) for i
-                 in range(len(untokenized_sent))])
-            assert single_layer_features.shape[0] == len(observation.sentence)
-            single_layer_features_list.append(single_layer_features)
-        return single_layer_features_list
-
-    def optionally_add_embeddings(self, observations, pretrained_embeddings_path):
-        """Adds pre-computed BERT embeddings from disk to Observations."""
-        layer_index = self.args['model']['model_layer']
-        print('Loading BERT Pretrained Embeddings from {}; using layer {}'.format(pretrained_embeddings_path,
-                                                                                  layer_index))
-        embeddings = self.generate_subword_embeddings_from_hdf5(observations, pretrained_embeddings_path, layer_index)
-        observations = self.add_embeddings_to_observations(observations, embeddings)
-        return observations
-
-
-class DISTILDataset(SubwordDataset):
-    """Dataloader for conllx files and pre-computed Distil embeddings.
-
-  See SimpleDataset.
-  Attributes:
-    args: the global yaml-derived experiment config dictionary
-  """
-
-    def generate_subword_embeddings_from_hdf5(self, observations, filepath, elmo_layer, subword_tokenizer=None, break_on_qmark=False):
+    def generate_subword_embeddings_from_hdf5(self, observations, filepath, layer, subword_tokenizer=None, break_on_qmark=False):
         '''Reads pre-computed subword embeddings from hdf5-formatted file.
 
     Sentences should be given integer keys corresponding to their order
@@ -458,7 +323,6 @@ class DISTILDataset(SubwordDataset):
           to downloading of prespecifed tokenizer problem. Not recoverable;
           exits immediately.
     '''
-        # torch.set_default_dtype(torch.float32)
         if subword_tokenizer == None:
             try:
                 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForMaskedLM
@@ -473,20 +337,21 @@ class DISTILDataset(SubwordDataset):
         hf = h5py.File(filepath, 'r')
         indices = list(hf.keys())
         single_layer_features_list = []
-        max_idx = 5000  # FIXME
+        max_idx = 5000  # FIXME: just used for debugging.
         for index in tqdm(sorted([int(x) for x in indices]), desc='[aligning embeddings]'):
-            # print("IDX", index)
             if index > max_idx:
                 print("Breaking after", max_idx)
                 break
             observation = observations[index]
             feature_stack = hf[str(index)]
-            single_layer_features = feature_stack[elmo_layer]
-            # I know this is gross, but I haven't done full refactoring yet.
+            single_layer_features = feature_stack[layer]
             # There are two times when this method is called: when aligning embeddings to train the probe and when
             # aligning embeddings to then turn them into counterfactual embeddings.
-            # In the first case, we use PTB and want to leave question marks in; in the second case, we want to
-            # use the question marks to break up the sentence and question.
+            # In the first case, we use PTB and want to leave question marks in.
+            # In the second case, we want to use the question marks to break up the sentence and question if we're doing
+            # this for a QA task.
+            # The easiest way I could think of for doing this was to just add the break_on_qmark boolean field to the
+            # config.
             if break_on_qmark and '?' in observation.sentence:  # Question-answer case!
                 line_str = ' '.join(observation.sentence)
                 q_mark_idx = line_str.index('?')
@@ -513,7 +378,7 @@ class DISTILDataset(SubwordDataset):
     def optionally_add_embeddings(self, observations, pretrained_embeddings_path, break_on_qmark=False):
         """Adds pre-computed BERT embeddings from disk to Observations."""
         layer_index = self.args['model']['model_layer']
-        print('Loading DISTIL Pretrained Embeddings from {}; using layer {}'.format(pretrained_embeddings_path,
+        print('Loading BERT Pretrained Embeddings from {}; using layer {}'.format(pretrained_embeddings_path,
                                                                                   layer_index))
         embeddings = self.generate_subword_embeddings_from_hdf5(observations, pretrained_embeddings_path, layer_index, break_on_qmark=break_on_qmark)
         observations = self.add_embeddings_to_observations(observations, embeddings)

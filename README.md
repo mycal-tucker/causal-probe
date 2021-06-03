@@ -1,9 +1,8 @@
 # causal-probe
 
 ## Open issues to clean up before publicizing fully:
-1) break_on_qmark used in training probes? I don't think it's used.
-2) Make gen_training_data.py take parameters.
-3) Clean up probe classes to make the number of layers a parameter. Also modifies config.
+1) Make gen_training_data.py take parameters.
+2) Clean up probe classes to make the number of layers a parameter. Also modifies config.
 
 
 ## Example workflow
@@ -12,7 +11,8 @@ All scripts must be run from causal-probe/
 ### Training probes
 To generate counterfactuals, we need trained probes. This isn't the core research here, so if you have trouble, just email mycal@mit.edu. But the steps below should get you training probes easily enough.
 1) Run scripts/gen_training_data.py with ``source_dir = 'data/ptb'`` and ``filename='ptb_test``(and dev and train),
-As a heads up, the resulting .hdf5 files are quite big, so make sure you have about 80 GB of disk space.
+   As a heads up, the resulting .hdf5 files are quite big, so make sure you have about 80 GB of disk space.
+   Oh, and set break_on_qmark to False, because we don't want to break things up by question mark when training the probe (but we will later for QA counterfactual embeddings).
 2) Run ``src/scripts/train_probes.py`` with a parameter pointing to the config file ``config/example/parse_dist_ptb.yaml``. This trains the probes and takes a few hours to run.
 Trained probes, with performance metrics, are saved to the reporting destination, specified in config.
    
