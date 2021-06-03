@@ -76,55 +76,28 @@ def choose_probe_class(args):
   Returns:
     A probe_class to be instantiated.
   """
-    # TODO: make probes accept parameters for number of layers, and therefore clean up this logic.
     if args['probe']['task_signature'] == 'word':
         if args['probe']['psd_parameters']:
             return probe.OneWordPSDProbe
-        else:
-            return probe.OneWordNonPSDProbe
-    elif args['probe']['task_signature'] == 'word_2deep':
-        return probe.OneWordPSDProbe2
-    elif args['probe']['task_signature'] == 'word_3deep':
-        return probe.OneWordPSDProbe3
     elif args['probe']['task_signature'] == 'word_pair':
-        if args['probe']['psd_parameters']:
-            return probe.TwoWordPSDProbe
-        else:
-            return probe.TwoWordNonPSDProbe
-    elif args['probe']['task_signature'] == 'word_pair_2deep':
-        print("Two-layer distance probe!")
-        assert args['probe']['psd_parameters']
-        return probe.TwoWordDeepProbe2
-    elif args['probe']['task_signature'] == 'word_pair_3deep':
-        print("Three-layer distance probe!")
-        assert args['probe']['psd_parameters']
-        return probe.TwoWordDeepProbe3
+        return probe.TwoWordPSDProbe
     else:
         raise ValueError("Unknown probe type (probe function signature): {}".format(
             args['probe']['task_signature']))
 
 
 def choose_model_class(args):
-    """Chooses which reporesentation learner class to use based on config.
+    """Chooses which representation learner class to use based on config.
+
+    Like dataset, this is legacy from prior code supporting different model types. We only support BERT-disk
 
   Args:
     args: the global config dictionary built by yaml.
   Returns:
     A class to be instantiated as a model to supply word representations.
   """
-    # FIXME: like for dataset, should only have one model class.
-    if args['model']['model_type'] == 'ELMo-disk':
+    if args['model']['model_type'] == 'BERT-disk':
         return model.DiskModel
-    elif args['model']['model_type'] == 'BERT-disk':
-        return model.DiskModel
-    elif args['model']['model_type'] == 'DistilQA-disk':
-        return model.DiskModel
-    elif args['model']['model_type'] == 'ELMo-random-projection':
-        return model.ProjectionModel
-    elif args['model']['model_type'] == 'ELMo-decay':
-        return model.DecayModel
-    elif args['model']['model_type'] == 'pytorch_model':
-        raise ValueError("Using pytorch models for embeddings not yet supported...")
     else:
         raise ValueError("Unknown model type: {}".format(
             args['model']['model_type']))
@@ -165,11 +138,11 @@ def run_report_results(args, probe, dataset, model, loss, reporter, regimen):
     dev_predictions = regimen.predict(probe, model, dev_dataloader)
     reporter(dev_predictions, dev_dataloader, 'dev')
 
-
     # Uncomment to run on the test set
     # test_dataloader = dataset.get_test_dataloader()
     # test_predictions = regimen.predict(probe, model, test_dataloader)
     # reporter(test_predictions, test_dataloader, 'test')
+
 
 def execute_experiment(args, train_probe, report_results):
     """

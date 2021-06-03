@@ -1,29 +1,42 @@
 """Classes for specifying probe pytorch modules."""
+from abc import ABC
 
 import torch.nn as nn
 import torch
 
-class Probe(nn.Module):
-  pass
+
+class Probe(nn.Module, ABC):
+    pass
+
 
 class TwoWordPSDProbe(Probe):
-  """ Computes squared L2 distance after projection by a matrix.
+    """ Computes squared L2 distance after projection by a probe.
 
   For a batch of sentences, computes all n^2 pairs of distances
   for each sentence in the batch.
   """
-  def __init__(self, args):
-    print('Constructing TwoWordPSDProbe')
-    super(TwoWordPSDProbe, self).__init__()
-    self.args = args
-    self.probe_rank = args['probe']['maximum_rank']
-    self.model_dim = args['model']['hidden_dim']
-    self.proj = nn.Parameter(data = torch.zeros(self.model_dim, self.probe_rank))
-    nn.init.uniform_(self.proj, -0.05, 0.05)
-    self.to(args['device'])
 
-  def forward(self, batch):
-    """ Computes all n^2 pairs of distances after projection
+    def __init__(self, args):
+        print('Constructing TwoWordPSDProbe')
+        super(TwoWordPSDProbe, self).__init__()
+        self.args = args
+        self.probe_rank = args['probe']['maximum_rank']
+        self.num_layers = args['probe'].get('num_layers')
+        if self.num_layers is None:
+            print("Number of probe layers unspecified; defaulting to 1")
+            self.num_layers = 1
+        self.model_dim = args['model']['hidden_dim']
+        last_embedding_dim = self.model_dim
+        hidden_dim = 1024
+        self.layers = nn.ModuleList()
+        for layer_idx in range(self.num_layers - 1):
+            self.layers.append(nn.Linear(last_embedding_dim, hidden_dim))
+            last_embedding_dim = hidden_dim
+        self.layers.append(nn.Linear(last_embedding_dim, self.probe_rank))
+        self.to(args['device'])
+
+    def forward(self, batch):
+        """ Computes all n^2 pairs of distances after projection
     for each sentence in a batch.
 
     Note that due to padding, some distances will be non-zero for pads.
@@ -35,118 +48,42 @@ class TwoWordPSDProbe(Probe):
     Returns:
       A tensor of distances of shape (batch_size, max_seq_len, max_seq_len)
     """
-    transformed = torch.matmul(batch, self.proj)
-    batchlen, seqlen, rank = transformed.size()
-    transformed = transformed.unsqueeze(2)
-    transformed = transformed.expand(-1, -1, seqlen, -1)
-    transposed = transformed.transpose(1,2)
-    diffs = transformed - transposed
-    squared_diffs = diffs.pow(2)
-    squared_distances = torch.sum(squared_diffs, -1)
-    return squared_distances
-
-class TwoWordDeepProbe2(Probe):
-  """ A deeper, non-linear version of the distance probe.
-
-  For a batch of sentences, computes all n^2 pairs of distances
-  for each sentence in the batch.
-  """
-  def __init__(self, args):
-    print('Constructing 2-layer TwoWordPSDProbe')
-    super(TwoWordDeepProbe2, self).__init__()
-    self.args = args
-    self.probe_rank = args['probe']['maximum_rank']
-    self.model_dim = args['model']['hidden_dim']
-    self.linear1 = torch.nn.Linear(self.model_dim, 1024)
-    self.linear2 = torch.nn.Linear(1024, self.probe_rank)
-    self.to(args['device'])
-
-  def forward(self, batch):
-    """ Computes all n^2 pairs of distances after projection
-    for each sentence in a batch.
-
-    Note that due to padding, some distances will be non-zero for pads.
-    Computes (B(h_i-h_j))^T(B(h_i-h_j)) for all i,j
-
-    Args:
-      batch: a batch of word representations of the shape
-        (batch_size, max_seq_len, representation_dim)
-    Returns:
-      A tensor of distances of shape (batch_size, max_seq_len, max_seq_len)
-    """
-    h_relu = self.linear1(batch).clamp(min=0)
-    transformed = self.linear2(h_relu)
-    batchlen, seqlen, rank = transformed.size()
-    transformed = transformed.unsqueeze(2)
-    transformed = transformed.expand(-1, -1, seqlen, -1)
-    transposed = transformed.transpose(1,2)
-    diffs = transformed - transposed
-    squared_diffs = diffs.pow(2)
-    squared_distances = torch.sum(squared_diffs, -1)
-    return squared_distances
-
-
-class TwoWordDeepProbe3(Probe):
-  """ A deeper, non-linear version of the distance probe.
-
-  For a batch of sentences, computes all n^2 pairs of distances
-  for each sentence in the batch.
-  """
-  def __init__(self, args):
-    print('Constructing 3-layer TwoWordPSDProbe')
-    super(TwoWordDeepProbe3, self).__init__()
-    self.args = args
-    self.probe_rank = args['probe']['maximum_rank']
-    self.model_dim = args['model']['hidden_dim']
-    self.linear1 = torch.nn.Linear(self.model_dim, 1024)
-    self.linear2 = torch.nn.Linear(1024, 1024)
-    self.linear3 = torch.nn.Linear(1024, self.probe_rank)
-    self.to(args['device'])
-
-  def forward(self, batch):
-    """ Computes all n^2 pairs of distances after projection
-    for each sentence in a batch.
-
-    Note that due to padding, some distances will be non-zero for pads.
-    Computes (B(h_i-h_j))^T(B(h_i-h_j)) for all i,j
-
-    Args:
-      batch: a batch of word representations of the shape
-        (batch_size, max_seq_len, representation_dim)
-    Returns:
-      A tensor of distances of shape (batch_size, max_seq_len, max_seq_len)
-    """
-    h_relu = self.linear1(batch).clamp(min=0)
-    h_relu = self.linear2(h_relu).clamp(min=0)
-    transformed = self.linear3(h_relu)
-    batchlen, seqlen, rank = transformed.size()
-    transformed = transformed.unsqueeze(2)
-    transformed = transformed.expand(-1, -1, seqlen, -1)
-    transposed = transformed.transpose(1,2)
-    diffs = transformed - transposed
-    squared_diffs = diffs.pow(2)
-    squared_distances = torch.sum(squared_diffs, -1)
-    return squared_distances
+        transformed = batch
+        for layer in self.layers:
+            transformed = layer(transformed).clamp(min=0)
+        batchlen, seqlen, rank = transformed.size()
+        transformed = transformed.unsqueeze(2)
+        transformed = transformed.expand(-1, -1, seqlen, -1)
+        transposed = transformed.transpose(1, 2)
+        diffs = transformed - transposed
+        squared_diffs = diffs.pow(2)
+        squared_distances = torch.sum(squared_diffs, -1)
+        return squared_distances
 
 
 class OneWordPSDProbe(Probe):
-  """ Computes squared L2 norm of words after projection by a matrix."""
+    def __init__(self, args):
+        print('Constructing OneWordPSDProbe')
+        super(OneWordPSDProbe, self).__init__()
+        self.args = args
+        self.probe_rank = args['probe']['maximum_rank']
+        self.num_layers = args['probe'].get('num_layers')
+        if self.num_layers is None:
+            print("Number of probe layers unspecified; defaulting to 1")
+            self.num_layers = 1
+        self.model_dim = args['model']['hidden_dim']
+        last_embedding_dim = self.model_dim
+        hidden_dim = 1024
+        self.layers = nn.ModuleList()
+        for layer_idx in range(self.num_layers - 1):
+            self.layers.append(nn.Linear(last_embedding_dim, hidden_dim))
+            last_embedding_dim = hidden_dim
+        self.layers.append(nn.Linear(last_embedding_dim, self.probe_rank))
+        self.to(args['device'])
 
-  def __init__(self, args):
-    print('Constructing OneWordPSDProbe')
-    super(OneWordPSDProbe, self).__init__()
-    self.args = args
-    self.probe_rank = args['probe']['maximum_rank']
-    self.model_dim = args['model']['hidden_dim']
-    self.proj = nn.Parameter(data = torch.zeros(self.model_dim, self.probe_rank))
-    nn.init.uniform_(self.proj, -0.05, 0.05)
-    self.to(args['device'])
-
-  def forward(self, batch):
-    """ Computes all n depths after projection
+    def forward(self, batch):
+        """ Computes all n depths after projection
     for each sentence in a batch.
-
-    Computes (Bh_i)^T(Bh_i) for all i
 
     Args:
       batch: a batch of word representations of the shape
@@ -154,153 +91,11 @@ class OneWordPSDProbe(Probe):
     Returns:
       A tensor of depths of shape (batch_size, max_seq_len)
     """
-    transformed = torch.matmul(batch, self.proj)
-    batchlen, seqlen, rank = transformed.size()
-    norms = torch.bmm(transformed.view(batchlen* seqlen, 1, rank),
-        transformed.view(batchlen* seqlen, rank, 1))
-    norms = norms.view(batchlen, seqlen)
-    return norms
-
-
-class OneWordPSDProbe2(Probe):
-  """ Computes squared L2 norm of words after projection by a matrix."""
-
-  def __init__(self, args):
-    print('Constructing OneWordPSDProbe')
-    super(OneWordPSDProbe2, self).__init__()
-    self.args = args
-    self.probe_rank = args['probe']['maximum_rank']
-    self.model_dim = args['model']['hidden_dim']
-    self.linear1 = torch.nn.Linear(self.model_dim, 1024)
-    self.linear2 = torch.nn.Linear(1024, self.probe_rank)
-    self.to(args['device'])
-
-  def forward(self, batch):
-    """ Computes all n depths after projection
-    for each sentence in a batch.
-
-    Computes (Bh_i)^T(Bh_i) for all i
-
-    Args:
-      batch: a batch of word representations of the shape
-        (batch_size, max_seq_len, representation_dim)
-    Returns:
-      A tensor of depths of shape (batch_size, max_seq_len)
-    """
-    h_relu = self.linear1(batch).clamp(min=0)
-    transformed = self.linear2(h_relu)
-    batchlen, seqlen, rank = transformed.size()
-    norms = torch.bmm(transformed.view(batchlen* seqlen, 1, rank),
-        transformed.view(batchlen* seqlen, rank, 1))
-    norms = norms.view(batchlen, seqlen)
-    return norms
-
-class OneWordPSDProbe3(Probe):
-  """ Computes squared L2 norm of words after projection by a matrix."""
-
-  def __init__(self, args):
-    print('Constructing OneWordPSDProbe')
-    super(OneWordPSDProbe3, self).__init__()
-    self.args = args
-    self.probe_rank = args['probe']['maximum_rank']
-    self.model_dim = args['model']['hidden_dim']
-    self.linear1 = torch.nn.Linear(self.model_dim, 1024)
-    self.linear2 = torch.nn.Linear(1024, 1024)
-    self.linear3 = torch.nn.Linear(1024, self.probe_rank)
-    self.to(args['device'])
-
-  def forward(self, batch):
-    """ Computes all n depths after projection
-    for each sentence in a batch.
-
-    Computes (Bh_i)^T(Bh_i) for all i
-
-    Args:
-      batch: a batch of word representations of the shape
-        (batch_size, max_seq_len, representation_dim)
-    Returns:
-      A tensor of depths of shape (batch_size, max_seq_len)
-    """
-    h_relu = self.linear1(batch).clamp(min=0)
-    h_relu = self.linear2(h_relu).clamp(min=0)
-    transformed = self.linear3(h_relu)
-    batchlen, seqlen, rank = transformed.size()
-    norms = torch.bmm(transformed.view(batchlen* seqlen, 1, rank),
-        transformed.view(batchlen* seqlen, rank, 1))
-    norms = norms.view(batchlen, seqlen)
-    return norms
-
-
-
-class OneWordNonPSDProbe(Probe):
-  """Computes a bilinear affinity between each word representation and itself.
-  
-  This is different from the probes in A Structural Probe... as the
-  matrix in the quadratic form is not guaranteed positive semi-definite
-  
-  """
-
-  def __init__(self, args):
-    print('Constructing OneWordNonPSDProbe')
-    super(OneWordNonPSDProbe, self).__init__()
-    self.args = args
-    self.model_dim = args['model']['hidden_dim']
-    self.proj = nn.Parameter(data = torch.zeros(self.model_dim, self.model_dim))
-    nn.init.uniform_(self.proj, -0.05, 0.05)
-    self.to(args['device'])
-
-  def forward(self, batch):
-    """ Computes all n depths after projection
-    for each sentence in a batch.
-
-    Computes (h_i^T)A(h_i) for all i
-
-    Args:
-      batch: a batch of word representations of the shape
-        (batch_size, max_seq_len, representation_dim)
-    Returns:
-      A tensor of depths of shape (batch_size, max_seq_len)
-    """
-    transformed = torch.matmul(batch, self.proj)
-    batchlen, seqlen, rank = batch.size()
-    norms = torch.bmm(transformed.view(batchlen* seqlen, 1, rank),
-        batch.view(batchlen*seqlen, rank, 1))
-    norms = norms.view(batchlen, seqlen)
-    return norms
-
-class TwoWordNonPSDProbe(Probe):
-  """ Computes a bilinear function of difference vectors.
-
-  For a batch of sentences, computes all n^2 pairs of scores
-  for each sentence in the batch.
-  """
-  def __init__(self, args):
-    print('TwoWordNonPSDProbe')
-    super(TwoWordNonPSDProbe, self).__init__()
-    self.args = args
-    self.probe_rank = args['probe']['maximum_rank']
-    self.model_dim = args['model']['hidden_dim']
-    self.proj = nn.Parameter(data = torch.zeros(self.model_dim, self.model_dim))
-    nn.init.uniform_(self.proj, -0.05, 0.05)
-    self.to(args['device'])
-
-  def forward(self, batch):
-    """ Computes all n^2 pairs of difference scores
-    for each sentence in a batch.
-
-    Note that due to padding, some distances will be non-zero for pads.
-    Computes (h_i-h_j)^TA(h_i-h_j) for all i,j
-
-    Args:
-      batch: a batch of word representations of the shape
-        (batch_size, max_seq_len, representation_dim)
-    Returns:
-      A tensor of scores of shape (batch_size, max_seq_len, max_seq_len)
-    """
-    batchlen, seqlen, rank = batch.size()
-    batch_square = batch.unsqueeze(2).expand(batchlen, seqlen, seqlen, rank)
-    diffs = (batch_square - batch_square.transpose(1,2)).view(batchlen*seqlen*seqlen, rank)
-    psd_transformed = torch.matmul(diffs, self.proj).view(batchlen*seqlen*seqlen,1,rank)
-    dists = torch.bmm(psd_transformed, diffs.view(batchlen*seqlen*seqlen, rank, 1))
-    dists = dists.view(batchlen, seqlen, seqlen)
-    return dists
+        transformed = batch
+        for layer in self.layers:
+            transformed = layer(transformed).clamp(min=0)
+        batchlen, seqlen, rank = transformed.size()
+        norms = torch.bmm(transformed.view(batchlen * seqlen, 1, rank),
+                          transformed.view(batchlen * seqlen, rank, 1))
+        norms = norms.view(batchlen, seqlen)
+        return norms

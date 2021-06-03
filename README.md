@@ -2,7 +2,8 @@
 
 ## Open issues to clean up before publicizing fully:
 1) Make gen_training_data.py take parameters.
-2) Clean up probe classes to make the number of layers a parameter. Also modifies config.
+2) Plotting probe performance needs to be a lot easier.
+3) How do we copy trained probes to directories for generating counterfactuals?
 
 
 ## Example workflow
