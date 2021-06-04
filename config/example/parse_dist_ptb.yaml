@@ -32,7 +32,7 @@ model:
 probe:
   task_signature: word_pair # word, word_pair
   task_name: parse-distance  # parse-depth, parse-distance
-  num_layers: 1
+  num_layers: 2
   maximum_rank: 32
   diagonal: False
   params_path: predictor.params

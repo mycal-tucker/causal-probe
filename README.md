@@ -16,6 +16,8 @@ To generate counterfactuals, we need trained probes. This isn't the core researc
    Oh, and set break_on_qmark to False, because we don't want to break things up by question mark when training the probe (but we will later for QA counterfactual embeddings).
 2) Run ``src/scripts/train_probes.py`` with a parameter pointing to the config file ``config/example/parse_dist_ptb.yaml``. This trains the probes and takes a few hours to run.
 Trained probes, with performance metrics, are saved to the reporting destination, specified in config.
+ 3) If you want to plot the probe performance metrics instead of just reading the files, look at the ``plotting/plot_probe_perf.py`` script.
+   It pulls out some of the basic metrics and plots them. You might have to do some editing of the file if you want the depth probe vs. distance probe, for example.
    
 ### Generating syntactically interesting setup.
 This is how to generate the data that we'll use for counterfactuals. It's actually a lot like the steps used for training probes.

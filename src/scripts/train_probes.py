@@ -77,8 +77,7 @@ def choose_probe_class(args):
     A probe_class to be instantiated.
   """
     if args['probe']['task_signature'] == 'word':
-        if args['probe']['psd_parameters']:
-            return probe.OneWordPSDProbe
+        return probe.OneWordPSDProbe
     elif args['probe']['task_signature'] == 'word_pair':
         return probe.TwoWordPSDProbe
     else:
