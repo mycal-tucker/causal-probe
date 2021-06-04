@@ -2,14 +2,16 @@
 import h5py
 import numpy as np
 import torch
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from transformers import AutoTokenizer, AutoModelForMaskedLM
 
-tokenizer = AutoTokenizer.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
-model = AutoModelForQuestionAnswering.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
+# We default to using a model trained on the cloze task. If you're interested in other models, make sure to fetch them
+# here. E.g., previously, we used a qa model that had been finetuned on squad.
+tokenizer = AutoTokenizer.from_pretrained("bert-large-uncased-whole-word-masking")
+model = AutoModelForMaskedLM.from_pretrained("bert-large-uncased-whole-word-masking")
 
 # Set the desired source_dir and filename here.
-source_dir = 'data/ptb/'
-filename = 'ptb_train'
+source_dir = 'data/example/'
+filename = 'text'
 break_on_qmark = False
 
 source_file = source_dir + filename + '.txt'
@@ -21,7 +23,7 @@ hf = h5py.File(targ_file, 'w')
 for line in file1:
     print()
     print("Analyzing line number", idx)
-    if '?' in line and break_on_qmark:  # Question case:
+    if '?' in line and break_on_qmark:  # This is legacy from QA model functionality, which should be brought back at some point.
         q_mark_idx = line.index('?')
         context = line[q_mark_idx + 2:]
         question = line[:q_mark_idx + 1]
@@ -38,7 +40,7 @@ for line in file1:
             answer_end = (torch.argmax(model_output[1], dim=1) + 1).numpy()[0]
             selected_tokens = inputs["input_ids"][0][answer_start:answer_end]
             print("Answer", tokenizer.decode(selected_tokens))
-        _, _, embeddings = model_output
+        embeddings = model_output[-1]
         np_embeddings = np.zeros((25, embeddings[0].shape[1], embeddings[0].shape[2]))
         for layer in range(25):
             np_embeddings[layer] = embeddings[layer].numpy()
