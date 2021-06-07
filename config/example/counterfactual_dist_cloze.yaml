@@ -12,35 +12,35 @@ dataset:
      - extra_info
      - embeddings
   corpus:
-    root: data/ptb/
-    train_path: ptb_train.conllx
-    dev_path: ptb_dev.conllx
-    test_path: ptb_test.conllx
+    root: data/example/
+    train_path: text.conllx
+    dev_path: text.conllx
+    test_path: text.conllx
   embeddings:
     type: token
-    root: data/ptb/
-    train_path: ptb_train.hdf5
-    dev_path: ptb_dev.hdf5
-    test_path: ptb_test.hdf5
+    root: data/example/
+    train_path: text.hdf5
+    dev_path: text.hdf5
+    test_path: text.hdf5
     break_on_qmark: False
-  batch_size: 40
+  batch_size: 80  # How many counterfactuals do you want to update at once?
 model:
   hidden_dim: 1024
   model_type: BERT-disk
   use_disk: True
   model_layer: -1  # Doesn't matter, gets overwritten by script that iterates over layers.
 probe:
-  task_signature: word # word, word_pair
-  task_name: parse-depth  # parse-depth, parse-distance
+  task_signature: word_pair # word, word_pair
+  task_name: parse-distance  # parse-depth, parse-distance
   num_layers: 1
   maximum_rank: 32
   diagonal: False
   params_path: predictor.params
 probe_training:
-  epochs: 30
+  epochs: 0  # Ignored in counterfactual generation
   loss: L1
 reporting:
-  root: saved_models/example/model_depth_1layer/model_depth
+  root: counterfactuals/example/model_dist_1layer/model_dist
   observation_paths:
     train_path: train.observations
     dev_path: dev.observations
@@ -49,6 +49,3 @@ reporting:
     train_path: train.predictions
     dev_path: dev.predictions
     test_path: test.predictions
-  reporting_methods:
-    - spearmanr
-    - root_acc

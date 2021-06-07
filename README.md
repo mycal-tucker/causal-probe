@@ -14,7 +14,7 @@ All scripts must be run from causal-probe/
 
 ### Training probes
 To generate counterfactuals, we need trained probes. This isn't the core research here, so if you have trouble, just email mycal@mit.edu. But the steps below should get you training probes easily enough.
-1) Run scripts/gen_training_data.py with ``source_dir = 'data/ptb/'`` and ``filename='ptb_test``(and dev and train),
+1) Run scripts/gen_embeddings.py with ``source_dir = 'data/ptb/'`` and ``filename='ptb_test``(and dev and train),
    As a heads up, the resulting .hdf5 files are quite big, so make sure you have about 80 GB of disk space.
    Oh, and set break_on_qmark to False, because we don't want to break things up by question mark when training the probe (but we will later for QA counterfactual embeddings).
 2) Run ``src/scripts/train_probes.py`` with a parameter pointing to the config file ``config/example/parse_dist_ptb.yaml``. This trains the probes and takes a few hours to run.
@@ -31,13 +31,22 @@ This is how to generate the data that we'll use for counterfactuals. It's actual
 
 ``sudo java -mx3g -cp "*" edu.stanford.nlp.trees.EnglishGrammaticalStructure -treeFile ~/src/causal-probe/data/example/text.trees -checkConnected -basic -keepPunct -conllx > ~/src/causal-probe/data/example/text.conllx``
 
-3) Run scripts/gen_training_data.py. This generates embeddings for each layer for each of the sentences in the specified text file and saves them to an hdf5 file.
+3) Run scripts/gen_embeddings.py. This generates embeddings for each layer for each of the sentences in the specified text file and saves them to an hdf5 file.
 
 At this point, we have the embeddings for the interesting sentences created, so in the next step, we will create counterfactuals.
 
 ### Generating the counterfactuals.
 Now that we have the embeddings for the interesting sentences and the interesting parses, let's generate the counterfactual embeddings.
 
+We'll end up saving the embeddings as files, and it makes sense to group them with the trained probes, but maybe not in the saved_models directory.
+
+1) To copy over the trained models, you can do it by hand, or you can use the ``src/scripts/migrate_trained_probes.py`` script. It just copies over the model parameters.
+2) Run ``src/scripts/gen_counterfactuals.py`` with the argument of ``config/example/counterfactual_dist_cloze.yaml``.
+   This generates two .hdf5 files in the directories with the probe parameters (all under counterfactuals).
+   ``updated_words.hdf5`` had the counterfactual embeddings; ``original_words.hdf5`` has the original embeddings, but only for the words that got updated.
+   For QA models, for example, this means only the words in the sentence, rather that words in the question as well.
 
 ### Evaluating counterfactual behaviors.
-We've saved the counterfactual embeddings. Do the model outputs change as a result?
+We've saved the counterfactual embeddings to hdf5 files in the previous step. Now we want to see if it has changed the model outputs.
+
+

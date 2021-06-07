@@ -40,7 +40,7 @@ probe_training:
   epochs: 30
   loss: L1
 reporting:
-  root: saved_models/example/model_dist
+  root: saved_models/example/model_dist_1layer/model_dist
   observation_paths:
     train_path: train.observations
     dev_path: dev.observations

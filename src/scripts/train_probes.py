@@ -9,100 +9,11 @@ import torch
 import yaml
 from tqdm import tqdm
 
-import models.model as model
-import models.probe as probe
-import utils.dataset as dataset
-import utils.loss as loss
 import utils.regimen as regimen
-import utils.reporter as reporter
-import utils.task as task
+from utils.training_utils import choose_task_classes, choose_dataset_class, choose_model_class, choose_probe_class
 
 
-def choose_task_classes(args):
-    """Chooses which task class to use based on config.
-
-  Args:
-    args: the global config dictionary built by yaml.
-  Returns:
-    A class to be instantiated as a task specification.
-  """
-    if args['probe']['task_name'] == 'parse-distance':
-        task_class = task.ParseDistanceTask
-        reporter_class = reporter.WordPairReporter
-        if args['probe_training']['loss'] == 'L1':
-            loss_class = loss.L1DistanceLoss
-        else:
-            raise ValueError("Unknown loss type for given probe type: {}".format(
-                args['probe_training']['loss']))
-    elif args['probe']['task_name'] == 'parse-depth':
-        task_class = task.ParseDepthTask
-        reporter_class = reporter.WordReporter
-        if args['probe_training']['loss'] == 'L1':
-            loss_class = loss.L1DepthLoss
-        else:
-            raise ValueError("Unknown loss type for given probe type: {}".format(
-                args['probe_training']['loss']))
-    else:
-        raise ValueError("Unknown probing task type: {}".format(
-            args['probe']['task_name']))
-    return task_class, reporter_class, loss_class
-
-
-def choose_dataset_class(args):
-    """
-
-    Legacy layer of abstraction for representing dataset class. We only have one type, so just pipes through right
-    now.
-
-  Args:
-    args: the global config dictionary built by yaml.
-  Returns:
-    A class to be instantiated as a dataset.
-  """
-    if args['model']['model_type'] == 'BERT-disk':
-        dataset_class = dataset.BERTDataset
-    else:
-        raise ValueError("Unknown model type for datasets: {}".format(
-            args['model']['model_type']))
-
-    return dataset_class
-
-
-def choose_probe_class(args):
-    """Chooses which probe and reporter classes to use based on config.
-
-  Args:
-    args: the global config dictionary built by yaml.
-  Returns:
-    A probe_class to be instantiated.
-  """
-    if args['probe']['task_signature'] == 'word':
-        return probe.OneWordPSDProbe
-    elif args['probe']['task_signature'] == 'word_pair':
-        return probe.TwoWordPSDProbe
-    else:
-        raise ValueError("Unknown probe type (probe function signature): {}".format(
-            args['probe']['task_signature']))
-
-
-def choose_model_class(args):
-    """Chooses which representation learner class to use based on config.
-
-    Like dataset, this is legacy from prior code supporting different model types. We only support BERT-disk
-
-  Args:
-    args: the global config dictionary built by yaml.
-  Returns:
-    A class to be instantiated as a model to supply word representations.
-  """
-    if args['model']['model_type'] == 'BERT-disk':
-        return model.DiskModel
-    else:
-        raise ValueError("Unknown model type: {}".format(
-            args['model']['model_type']))
-
-
-def run_train_probe(args, probe, dataset, model, loss, reporter, regimen):
+def run_train_probe(probe, dataset, model, loss, regimen):
     """Trains a structural probe according to args.
 
   Args:
@@ -123,7 +34,7 @@ def run_train_probe(args, probe, dataset, model, loss, reporter, regimen):
                                     dataset.get_train_dataloader(), dataset.get_dev_dataloader())
 
 
-def run_report_results(args, probe, dataset, model, loss, reporter, regimen):
+def run_report_results(args, probe, dataset, model, reporter, regimen):
     """
   Reports results from a structural probe according to args.
   By default, does so only for dev set.
@@ -168,10 +79,10 @@ def execute_experiment(args, train_probe, report_results):
 
     if train_probe:
         print('Training probe for layer', args['model']['model_layer'])
-        run_train_probe(args, expt_probe, expt_dataset, expt_model, expt_loss, expt_reporter, expt_regimen)
+        run_train_probe(expt_probe, expt_dataset, expt_model, expt_loss, expt_regimen)
     if report_results:
         print('Reporting results of trained probe...')
-        run_report_results(args, expt_probe, expt_dataset, expt_model, expt_loss, expt_reporter, expt_regimen)
+        run_report_results(args, expt_probe, expt_dataset, expt_model, expt_reporter, expt_regimen)
 
 
 def setup_new_experiment_dir(args, yaml_args, reuse_results_path):
