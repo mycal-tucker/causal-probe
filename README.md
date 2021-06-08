@@ -1,10 +1,7 @@
 # causal-probe
 
 ## Open issues to clean up before publicizing fully:
-1) Make gen_training_data.py take parameters.
-2) Plotting probe performance needs to be a lot easier.
-3) How do we copy trained probes to directories for generating counterfactuals?
-
+1) Redo this for QA model and make sure it works.
 
 ## Example workflow
 This README is mostly designed to walk you through a full working example from training probes to generating counterfactuals to evaluating results.
@@ -48,5 +45,33 @@ We'll end up saving the embeddings as files, and it makes sense to group them wi
 
 ### Evaluating counterfactual behaviors.
 We've saved the counterfactual embeddings to hdf5 files in the previous step. Now we want to see if it has changed the model outputs.
+Evaluation is done in two steps: first we pass the counterfactuals through the model and record outputs, and then we plot these outputs.
+We break the plotting up like this just because the first evaluation step can take a long time, so it's nice to have the saved files when you're playing with new plotting utils.
+
+1) Measure the effect of counterfactual embeddings by running ``src/scripts/eval_counterfactuals.py``.
+The variables near the top fo the script define directories to look up text data and the embeddings.
+The script produces .txt files that save relevant metrics about the model outputs using original and updated embeddings.
+2) Plot these saved outputs by running ``src/plotting/plot_counterfactual_results.py``.
+You set relevant directories by directly modifying the variables for different directories.
+There are lots of different types of plots to generate - the different plotting methods have comments at the top of them to say what each one does.
+   
+
+## Congratulations!
+Congratulations! You made it to the end. At this point, you should have done everything from training probes to plotting the effect of counterfactual embeddings.
+
+But don't stop here! There's so much more to do, as detailed by some of the ideas below:
+
+1) Use a different language model.
+To do this, you'll need to do this whole process from scratch: create new embeddings, train probes, etc.
+2) Evaluate on a different test suite.
+If all you want is a different evaluation suite, you can reuse your trained probes,t you'll need to start at the "generating syntactically interesting setup" to create new sentences, trees, and counterfactuals.
+3) Use a different type of probe.
+Very cool idea. To do this, you'll have to start editing the code itself instead of just tweaking parameters. You'll likely want to define a new probe in ``probe.py``. Make sure to update config to point to the new class, as well as updating the delegation logic in ``training_utils.py`` to then point to that class.
+4) Calculate other metrics for counterfactuals.
+If you want to look into aspects of the generated counterfactuals, the good news is that you don't need to train new probes or even generate new counterfactuals. Just update ``eval_counterfactuals.py`` to calculate a new metric and save it to a file, and then write new plotting logic to plot those metrics.
+We have an example of a fun metric of calculating the distance of counterfactuals in ``eval_counterfactuals.py`` that we do actively use.
+   
+If you have questions or more ideas, please reach out to mycal@mit.edu.
+If you find this work useful, please cite the paper with the BibTex below:
 
 

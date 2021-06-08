@@ -8,7 +8,7 @@ from tqdm import tqdm
 """
 Utility method copies over trained models from the saved_models area into counterfactuals.
 This will create the directory structure in which counterfactual embeddings will be saved, without corrupting
-the saved_models ectory.
+the saved_models directory.
 """
 
 source_dir = 'saved_models/example/model_dist_1layer'
