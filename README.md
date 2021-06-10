@@ -1,4 +1,9 @@
 # causal-probe
+Implementation of counterfactual probing technique discussed in "What if This Modified That? Syntactic Interventions via Counterfactual Embeddings" by Tucker et al.
+In brief, we generate counterfactual embeddings according to syntactic probes and see if these new embeddings modify the model outputs.
+
+If you find this code useful, please cite the paper.
+If you have questions, feel free to email mycal@mit.edu.
 
 ## Example workflow
 This README is mostly designed to walk you through a full working example from training probes to generating counterfactuals to evaluating results.
