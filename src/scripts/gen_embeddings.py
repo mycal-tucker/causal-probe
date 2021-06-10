@@ -1,18 +1,20 @@
-# from transformers import pipeline
 import h5py
 import numpy as np
 import torch
-from transformers import AutoTokenizer, AutoModelForMaskedLM
+from transformers import AutoTokenizer, AutoModelForMaskedLM, AutoModelForQuestionAnswering
 
 # We default to using a model trained on the cloze task. If you're interested in other models, make sure to fetch them
 # here. E.g., previously, we used a qa model that had been finetuned on squad.
 tokenizer = AutoTokenizer.from_pretrained("bert-large-uncased-whole-word-masking")
 model = AutoModelForMaskedLM.from_pretrained("bert-large-uncased-whole-word-masking")
+# Below are options for the QA model
+# tokenizer = AutoTokenizer.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
+# model = AutoModelForQuestionAnswering.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
 
 # Set the desired source_dir and filename here.
 source_dir = 'data/example/'
 filename = 'text'
-break_on_qmark = False
+break_on_qmark = False  # If you're using questions from a QA task, this should be true.
 
 source_file = source_dir + filename + '.txt'
 targ_file = source_dir + filename + '.hdf5'
@@ -23,7 +25,7 @@ hf = h5py.File(targ_file, 'w')
 for line in file1:
     print()
     print("Analyzing line number", idx)
-    if '?' in line and break_on_qmark:  # This is legacy from QA model functionality, which should be brought back at some point.
+    if '?' in line and break_on_qmark:
         q_mark_idx = line.index('?')
         context = line[q_mark_idx + 2:]
         question = line[:q_mark_idx + 1]

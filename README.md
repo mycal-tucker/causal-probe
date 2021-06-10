@@ -1,8 +1,5 @@
 # causal-probe
 
-## Open issues to clean up before publicizing fully:
-1) Redo this for QA model and make sure it works.
-
 ## Example workflow
 This README is mostly designed to walk you through a full working example from training probes to generating counterfactuals to evaluating results.
 We'll work through a specific example because modifying bits of functionality should be relatively simple within the framework.
@@ -54,7 +51,13 @@ The script produces .txt files that save relevant metrics about the model output
 2) Plot these saved outputs by running ``src/plotting/plot_counterfactual_results.py``.
 You set relevant directories by directly modifying the variables for different directories.
 There are lots of different types of plots to generate - the different plotting methods have comments at the top of them to say what each one does.
+Based on the findings from our work, you should find a consistent effect from using the distance-based probes to generate counterfactuals for mask word prediction.
    
+### What about QA Models?
+Although the prior steps all focused on the masked word prediction, we support models for extractive question answering.
+You'll have to redo everything for these models, though: generate new embeddings, train new probes, generate a test suite, generate counterfactuals, and plot.
+Most of the time, this just means modifying config or a few variables at the top of scripts (in particular, make sure you use appropriate tokenizers and models!!!).
+Because of the custom nature of plotting, we have a separate plotting script, ``plotting/plot_qa_counterfactual_results.py``, for visualizing the effect of QA counterfactuals.
 
 ## Congratulations!
 Congratulations! You made it to the end. At this point, you should have done everything from training probes to plotting the effect of counterfactual embeddings.

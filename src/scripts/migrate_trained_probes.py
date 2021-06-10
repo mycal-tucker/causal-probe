@@ -11,8 +11,8 @@ This will create the directory structure in which counterfactual embeddings will
 the saved_models directory.
 """
 
-source_dir = 'saved_models/example/model_dist_1layer'
-dest_dir = 'counterfactuals/example/model_dist_1layer'
+source_dir = 'saved_models/qa_example/model_dist_1layer'
+dest_dir = 'counterfactuals/qa_example/model_dist_1layer'
 
 model_prefix = 'model_dist'
 
